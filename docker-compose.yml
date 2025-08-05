@@ -17,8 +17,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.25"
-          memory: "30MB"
+          cpus: "0.42"
+          memory: "10MB"
 
   api1: &api
     build: .                # ✅ Vai buildar a imagem local usando seu Dockerfile
@@ -43,7 +43,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: "85MB"
+          memory: "150MB"
 
   api2:
     <<: *api
@@ -60,7 +60,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: "85MB"
+          memory: "150MB"
 
   redis:
     image: redis:7.2-alpine
@@ -76,26 +76,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.25"
-          memory: "100MB"
-
-  # db:
-  #   image: postgres:16
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #     POSTGRES_DB: rinha
-  #   volumes:
-  #     - ./db-data:/var/lib/postgresql/data
-  #   expose:
-  #     - "5432"
-  #   networks:
-  #     - backend
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: "0.3"
-  #         memory: "100MB"
+          cpus: "0.08"
+          memory: "40MB"
 
 networks:
   backend:

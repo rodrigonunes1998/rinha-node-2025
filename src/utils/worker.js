@@ -1,22 +1,30 @@
-const { Worker } = require('worker_threads');
 const path = require('path');
+const { Worker } = require('worker_threads');
 
-const workerPath = path.resolve(__dirname, './enqueueWorker.js');
+function startQueueWorker(id) {
+  const workerPath = path.resolve(__dirname, 'consumerWorker.js');
+  const worker = new Worker(workerPath, {
+    workerData: { workerId: id }, // Passando o ID para o worker
+  });
 
-const WORKER_COUNT = 2; // Número de workers paralelos
-const workers = [];
+  worker.on('online', () => {
+    console.log(`[MAIN] Worker ${id} iniciado`);
+  });
 
-// Round-robin control
-let currentWorker = 0;
+  worker.on('exit', code => {
+    if (code !== 0) {
+      console.error(`[MAIN] Worker ${id} finalizou com código ${code}`);
+    } else {
+      console.log(`[MAIN] Worker ${id} encerrado normalmente`);
+    }
+  });
 
-for (let i = 0; i < WORKER_COUNT; i++) {
-  workers.push(new Worker(workerPath));
+  worker.on('error', err => {
+    console.error(`[MAIN] Erro no Worker ${id}:`, err);
+  });
 }
 
-function getNextWorker() {
-  const worker = workers[currentWorker];
-  currentWorker = (currentWorker + 1) % WORKER_COUNT;
-  return worker;
+const concurrency = Number(process.env.WORKER_CONCURRENCY || 1);
+for (let i = 0; i < concurrency; i++) {
+  startQueueWorker(i);
 }
-
-module.exports = { getNextWorker, workers };

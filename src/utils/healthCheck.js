@@ -1,6 +1,4 @@
-const axios = require("axios");
 const redis = require("./redisConfig");
-
 const services = [
   { key: "service:A:url", url: `${process.env.PROCESSOR_DEFAULT_URL}/payments/service-health`, baseUrl: process.env.PROCESSOR_DEFAULT_URL },
   { key: "service:B:url", url: `${process.env.PROCESSOR_FALLBACK_URL}/payments/service-health`, baseUrl: process.env.PROCESSOR_FALLBACK_URL }
@@ -9,17 +7,31 @@ const services = [
 async function checkServices() {
   for (const service of services) {
     try {
-        console.log("[PROCESSANDO HEALTH CHECK]")
-      const res = await axios.get(service.url, { timeout: 2000 });
-      if (res.status === 200) {
-        await redis.set(service.key, service.baseUrl, {
-          EX: 10 // ✅ Agora o TTL é passado como objeto
-        });
+      console.log("[PROCESSANDO HEALTH CHECK]");
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2000); // 2s timeout
+
+      const res = await fetch(service.url, {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) throw new Error("Erro no fetch");
+
+      const data = await res.json();
+
+      if (data.failing === false) {
+        await redis.set(service.key, service.baseUrl, { EX: 10 });
         console.log(`✅ ${service.baseUrl} online`);
+      } else {
+        await redis.del(service.key);
+        console.log(`❌ ${service.baseUrl} marcado como offline (failing)`);
       }
-    } catch {
+    } catch (err) {
       await redis.del(service.key);
-      console.log(`❌ ${service.baseUrl} offline`);
+      console.log(`❌ ${service.baseUrl} offline: ${err.message}`);
     }
   }
 }
@@ -30,7 +42,7 @@ async function getActiveUrl(serviceKey) {
 }
 
 async function returnFirstServiceOn(serviceKey1, serviceKey2){
-    return await redis.get(serviceKey1) ?? await redis.get(serviceKey2)
+    return process.env.PROCESSOR_DEFAULT_URL;
 }
 
 module.exports = {checkServices, getActiveUrl, returnFirstServiceOn}

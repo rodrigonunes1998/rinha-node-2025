@@ -1,26 +1,22 @@
-const redis = require('./redisConfig');
-const {returnFirstServiceOn} = require('./healthCheck');
-const {dispatchPayment } = require('./processPayment');
-async function consumeQueue() {
-  console.log('🔄 Aguardando tarefas...');
+const { parentPort, workerData } = require("worker_threads");
+const redis = require("./redisConfig");
+const { dispatchPayment } = require("./processPayment");
+const DEFAULT_URL = process.env.PROCESSOR_DEFAULT_URL;
+const FALLBACK_URL = process.env.PROCESSOR_FALLBACK_URL;
 
-  while (true) {
-    const servicoOnline = await returnFirstServiceOn("service:A:url", "service:B:url");
+const BATCH_SIZE_MAX = 8;
+const workerId = workerData.workerId;
 
-    if (!servicoOnline) {
-      console.log("[SERVICO OFFLINE]: aguardando...");
-      await new Promise(res => setTimeout(res, 1000)); // espera 1s e tenta de novo
-      continue; // volta para o início do loop sem consumir nada
-    }
-
-    const result = await redis.brPop('fila_pagamentos', 0);
-    const task = JSON.parse(result.element);
-
-    console.log('[PROCESSANDO]:', task);
-    console.log("[SERVICO STATUS]: ", servicoOnline);
-
-    dispatchPayment(task, servicoOnline);
+(async () => {
+  console.log(`🔄 [WORKER-${workerId}] Aguardando tarefas...`);
+  while(true){
+    const task = await redis.brPop('fila_pagamentos', 0);
+    dispatchPayment(JSON.parse(task.element));
   }
-}
+})();
 
-consumeQueue();
+function timeoutPromise(ms) {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`Timeout após ${ms}ms`)), ms);
+  });
+}
